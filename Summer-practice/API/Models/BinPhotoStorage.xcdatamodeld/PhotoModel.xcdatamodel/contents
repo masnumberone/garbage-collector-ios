@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="21512" systemVersion="21G115" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="Bin" representedClassName=".Bin" syncable="YES">
+        <attribute name="class_name" optional="YES" attributeType="String"/>
+        <attribute name="classify_prob" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="detect_prob" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="id_bin_photo" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="x1" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="x2" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="y1" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="y2" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="binPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="BinPhoto" inverseName="bins" inverseEntity="BinPhoto"/>
+    </entity>
+    <entity name="BinPhoto" representedClassName=".BinPhoto" syncable="YES">
+        <attribute name="data" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="is_checked" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <relationship name="bins" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Bin" inverseName="binPhoto" inverseEntity="Bin"/>
+    </entity>
+</model>
