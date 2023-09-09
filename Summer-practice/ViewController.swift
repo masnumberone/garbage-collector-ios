@@ -46,6 +46,7 @@ class ViewController: UIViewController {
         view.layer.cornerRadius = 26
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isHidden = true
+        view.layer.cornerCurve = .continuous
         
         return view
     }()

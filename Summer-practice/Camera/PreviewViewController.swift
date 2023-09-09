@@ -13,6 +13,7 @@ class PreviewViewController: UIViewController {
         var view = UIImageView(image: image)
         view.clipsToBounds = true
         view.layer.cornerRadius = 60
+        view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
         
         return view

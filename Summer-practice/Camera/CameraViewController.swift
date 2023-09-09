@@ -107,6 +107,7 @@ class CameraViewController: UIViewController {
             videoPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
             videoPreviewLayer?.videoGravity = .resizeAspectFill
             videoPreviewLayer?.cornerRadius = 60
+            videoPreviewLayer?.cornerCurve = .continuous
             previewView.layer.addSublayer(videoPreviewLayer!)
             
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
