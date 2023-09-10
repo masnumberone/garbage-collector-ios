@@ -39,61 +39,15 @@ class ViewController: UIViewController {
         
         return view
     }()
-    
-    private lazy var bottomBackground: UIVisualEffectView = {
-        var view = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
-        view.clipsToBounds = true
-        view.layer.cornerRadius = 26
-        view.translatesAutoresizingMaskIntoConstraints = false
+
+    private lazy var stateView: BottomStateView = {
+        let view = BottomStateView(frame: .zero)
         view.isHidden = true
-        view.layer.cornerCurve = .continuous
-        
+        view.translatesAutoresizingMaskIntoConstraints = false
+
+        view.configure(onTapDeleteButton: deleteCurrentPhoto, onTapUpdateButton: updateCurrentPhoto)
+
         return view
-    }()
-    
-    private lazy var stateLabel: UILabel = {
-        var label = UILabel()
-        label.textAlignment = .left
-        label.text = "Trash is ok"
-        label.textColor = .white
-        label.font = .rounded(ofSize: 17, weight: .semibold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.isHidden = true
-        
-        
-        return label
-    }()
-    
-    
-    private lazy var deleteButton: UIButton = {
-        var button = UIButton()
-        button.setImage(UIImage(systemName: "trash"), for: .normal)
-        button.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(font: .rounded(ofSize: 22, weight: .semibold), scale: .default),
-                                               forImageIn: .normal)
-
-        button.tintColor = .white
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.isHidden = true
-        
-        button.addTarget(self, action: #selector(deleteCurrentPhoto), for: .touchUpInside)
-        
-        return button
-    }()
-    
-    
-    private lazy var updateButton: UIButton = {
-        var button = UIButton()
-        button.setImage(UIImage(systemName: "arrow.clockwise"), for: .normal)
-        button.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(font: .rounded(ofSize: 22, weight: .semibold), scale: .default),
-                                               forImageIn: .normal)
-
-        button.tintColor = .white
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.isHidden = true
-        
-        button.addTarget(self, action: #selector(updateCurrentPhoto), for: .touchUpInside)
-        
-        return button
     }()
     
     private lazy var preferencesButton: UIButton = {
@@ -119,16 +73,10 @@ class ViewController: UIViewController {
     var displayedItem = IndexPath(item: 0, section: 0) {
         didSet {
             if displayedItem.section > 0 {
-                stateLabel.isHidden = false
-                deleteButton.isHidden = false
-                updateButton.isHidden = false
-                bottomBackground.isHidden = false
+                stateView.isHidden = false
                 preferencesButton.isHidden = true
             } else {
-                stateLabel.isHidden = true
-                deleteButton.isHidden = true
-                updateButton.isHidden = true
-                bottomBackground.isHidden = true
+                stateView.isHidden = true
                 preferencesButton.isHidden = false
             }
         }
@@ -142,11 +90,7 @@ class ViewController: UIViewController {
         view.addSubview(backgroundPhotoView)
         view.addSubview(collectionView)
         
-        view.addSubview(bottomBackground)
-        view.addSubview(deleteButton)
-        view.addSubview(updateButton)
-        view.addSubview(stateLabel)
-        
+        view.addSubview(stateView)
         view.addSubview(preferencesButton)
         
         configureCollectionView()
@@ -206,18 +150,13 @@ class ViewController: UIViewController {
         }
         
         if !currentPhoto.is_checked {
-            stateLabel.text = "Fail send photo"
-            stateLabel.textColor = #colorLiteral(red: 1, green: 0.4932563305, blue: 0.4739957452, alpha: 1)
+            stateView.state = .fail
         } else if currentPhoto.bins?.count == 0 {
-            stateLabel.text = "Theare no trash bins"
-            stateLabel.textColor = .white
+            stateView.state = .noFound
         } else {
-            stateLabel.text = "Found \(currentPhoto.bins?.count ?? 0) bins"
-            stateLabel.textColor = .white
+            stateView.state = .found(currentPhoto.bins?.count ?? 0)
         }
     }
-    
-
     
     func configureCollectionView() {
         collectionView.delegate = self
@@ -268,42 +207,29 @@ class ViewController: UIViewController {
         backgroundCameraView.frame = collectionView.frame
         
         NSLayoutConstraint.activate([
-            bottomBackground.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
-            bottomBackground.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
-            bottomBackground.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomBackground.heightAnchor.constraint(equalToConstant: 52),
+            stateView.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            stateView.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            stateView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            stateView.heightAnchor.constraint(equalToConstant: 52),
             
             preferencesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             preferencesButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             preferencesButton.heightAnchor.constraint(equalToConstant: 44),
-            preferencesButton.widthAnchor.constraint(equalToConstant: 44),
-            
-            
-            stateLabel.leadingAnchor.constraint(equalTo: bottomBackground.leadingAnchor, constant: 19),
-            stateLabel.centerYAnchor.constraint(equalTo: bottomBackground.centerYAnchor),
-            stateLabel.trailingAnchor.constraint(lessThanOrEqualTo: bottomBackground.trailingAnchor, constant: -19),
-            
-            deleteButton.trailingAnchor.constraint(equalTo: bottomBackground.trailingAnchor, constant: -16),
-            deleteButton.centerYAnchor.constraint(equalTo: bottomBackground.centerYAnchor),
-            
-            updateButton.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -16),
-            updateButton.centerYAnchor.constraint(equalTo: bottomBackground.centerYAnchor)
+            preferencesButton.widthAnchor.constraint(equalToConstant: 44)
             
         ])
     }
-    
-    @objc
-    private func deleteCurrentPhoto() {
-        guard let currentPhoto = dataSource.itemIdentifier(for: displayedItem) as? BinPhoto else {
+
+    private lazy var deleteCurrentPhoto = { [weak self] in
+        guard let currentPhoto = self?.dataSource.itemIdentifier(for: self!.displayedItem) as? BinPhoto else {
             return
         }
         BinPhotoProvider.shared.deleteObject(currentPhoto)
-        updateDataSource()
+        self?.updateDataSource()
     }
-    
-    @objc
-    private func updateCurrentPhoto() {
-        guard let currentPhoto = dataSource.itemIdentifier(for: displayedItem) as? BinPhoto else {
+
+    private lazy var updateCurrentPhoto = { [weak self] in
+        guard let currentPhoto = self?.dataSource.itemIdentifier(for: self!.displayedItem) as? BinPhoto else {
             return
         }
         
@@ -324,8 +250,7 @@ class ViewController: UIViewController {
             
             DispatchQueue.main.async {
                 BinPhotoProvider.shared.saveContext()
-//                self.needUpdate()
-                self.updateView()
+                self?.updateView()
             }
             
         }
