@@ -12,8 +12,7 @@ import CoreData
 
 public class Bin: NSManagedObject {
     convenience init() {
-        let entity = NSEntityDescription.entity(forEntityName: "Bin", in: BinPhotoProvider.shared.managedContext)!
-        self.init(entity: entity, insertInto: BinPhotoProvider.shared.managedContext)
+        self.init(entity: Bin.entity(), insertInto: nil)
         id = UUID()
     }
 }

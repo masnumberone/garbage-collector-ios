@@ -1,5 +1,5 @@
 //
-//  PhotoCollectionView.swift
+//  PhotoView.swift
 //  Summer-practice
 //
 //  Created by work on 10.09.2023.
@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-class PhotoCollectionView: UIView {
+class PhotoView: UIView {
 
     private lazy var imageView: UIImageView = {
         var view = UIImageView(image: image)

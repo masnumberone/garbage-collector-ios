@@ -43,7 +43,7 @@ class CameraViewController: UIViewController {
     }()
     
     lazy var previewVC: PreviewViewController! = {
-        let vc = PreviewViewController(withDelegate: self.delegate)
+        let vc = PreviewViewController(with: model)
         vc.modalPresentationStyle = .fullScreen
         return vc
     }()
@@ -54,16 +54,28 @@ class CameraViewController: UIViewController {
         
         return dateFormatter
     }()
-    
-    init(withDelegate delegate: ViewControllerDelegateProtocol) {
+
+    private let model: BinPhotoManager
+
+    init(with model: BinPhotoManager) {
+        self.model = model
         super.init(nibName: nil, bundle: nil)
-        self.delegate = delegate
-        self.backgroundView = delegate.getCameraBackgroundView()
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    
+//    init(withDelegate delegate: ViewControllerDelegateProtocol) {
+//        super.init(nibName: nil, bundle: nil)
+//        self.delegate = delegate
+//        self.backgroundView = delegate.getCameraBackgroundView()
+//    }
+//    
+//    required init?(coder: NSCoder) {
+//        fatalError("init(coder:) has not been implemented")
+//    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -73,7 +85,7 @@ class CameraViewController: UIViewController {
             
         view.addSubview(previewView)
         view.addSubview(captureButton)
-        backgroundView.setLayer(sampleBufferDisplayLayer, withAnimation: false)
+//        backgroundView.setLayer(sampleBufferDisplayLayer, withAnimation: false)
         
         configureConstraints()
         

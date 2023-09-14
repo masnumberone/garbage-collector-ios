@@ -10,11 +10,10 @@ import Foundation
 import CoreData
 
 
-//@objc(BinPhoto)
+@objc(BinPhoto)
 public class BinPhoto: NSManagedObject {
     convenience init() {
-        let entity = NSEntityDescription.entity(forEntityName: "BinPhoto", in: BinPhotoProvider.shared.managedContext)!
-        self.init(entity: entity, insertInto: BinPhotoProvider.shared.managedContext)
+        self.init(entity: BinPhoto.entity(), insertInto: nil)
         id = UUID()
     }
 

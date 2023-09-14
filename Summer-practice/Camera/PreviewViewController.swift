@@ -43,16 +43,27 @@ class PreviewViewController: UIViewController {
     
     
     private var image: UIImage!
-    private weak var delegate: ViewControllerDelegateProtocol!
-    
-    init(withDelegate delegate: ViewControllerDelegateProtocol) {
-        self.delegate = delegate
+//    private weak var delegate: ViewControllerDelegateProtocol!
+
+    private let model: BinPhotoManager
+
+    init(with model: BinPhotoManager) {
+        self.model = model
         super.init(nibName: nil, bundle: nil)
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+//    init(withDelegate delegate: ViewControllerDelegateProtocol) {
+//        self.delegate = delegate
+//        super.init(nibName: nil, bundle: nil)
+//    }
+//
+//    required init?(coder: NSCoder) {
+//        fatalError("init(coder:) has not been implemented")
+//    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -121,37 +132,13 @@ class PreviewViewController: UIViewController {
     @objc
     private func send() {
         let photo = BinPhoto()
-        
-        photo.id = UUID()
+
         photo.date = Date.now
         photo.data = image.jpegData(compressionQuality: 0.8)
 
+        model.saveAndProcessPhoto(photo)
+
         print("send photo: ", dateFormatter.string(from: photo.date!))
-        
-        BinPhotoProvider.shared.saveContext()
-        delegate.needUpdate()
-        
-        QueryManager.shared.classifyBin(in: photo) { result in
-            switch result {
-            case .success(let bins):
-                photo.bins = NSSet(array: bins)
-                photo.is_checked = true
-                
-                bins.forEach {
-                    $0.binPhoto = photo
-                    $0.id_bin_photo = photo.id
-                }
-                
-            case .failure(_):
-                photo.is_checked = false
-            }
-            
-            DispatchQueue.main.async {
-                BinPhotoProvider.shared.saveContext()
-                self.delegate.needUpdate()
-            }
-            
-        }
         
         dismissVC()
     }

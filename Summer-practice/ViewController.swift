@@ -3,10 +3,12 @@
 //  Summer-practice
 //
 //  Created by work on 02.06.2023.
+//  Created by work on 02.06.2023.
 //
 
 import UIKit
 
+// две страницы в uipageview. вторая стринца содержит коллекцию и стейтВью поверх коллекции
 
 class ViewController: UIViewController {
     
@@ -107,7 +109,7 @@ class ViewController: UIViewController {
         snapshot.deleteAllItems()
         snapshot.appendSections(Section.allCases)
         
-        snapshot.appendItems([CameraViewController(withDelegate: self)], toSection: Section.camera)
+//        snapshot.appendItems([CameraViewController(withDelegate: self)], toSection: Section.camera)
         snapshot.appendItems(photos, toSection: Section.photo)
         
         collectionView.dataSource = dataSource

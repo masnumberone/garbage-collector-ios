@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+// NetworkManger
 class QueryManager {
     
     static let shared = QueryManager()

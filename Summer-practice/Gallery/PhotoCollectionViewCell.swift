@@ -10,8 +10,8 @@ import UIKit
 
 class PhotoCollectionViewCell: UICollectionViewCell {
     
-    private lazy var photoCollectionView: PhotoCollectionView = {
-        PhotoCollectionView(frame: bounds)
+    private lazy var photoView: PhotoView = {
+        PhotoView(frame: bounds)
     }()
     
     override init(frame: CGRect) {
@@ -24,10 +24,10 @@ class PhotoCollectionViewCell: UICollectionViewCell {
     }
     
     private func addSubviews() {
-        addSubview(photoCollectionView)
+        addSubview(photoView)
     }
     
     func configureWith(image: UIImage, bins: NSSet?) {
-        photoCollectionView.configureWith(image: image, bins: bins)
+        photoView.configureWith(image: image, bins: bins)
     }
 }
