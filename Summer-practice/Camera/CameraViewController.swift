@@ -7,58 +7,48 @@
 
 import Foundation
 import UIKit
-import AVFoundation
-import AVKit
 
 class CameraViewController: UIViewController {
-    private let session = AVCaptureSession()
-    private var videoPreviewLayer: AVCaptureVideoPreviewLayer?
-    private var captureOutput: AVCapturePhotoOutput?
-    private var videoDataOutput: AVCaptureVideoDataOutput!
-    
-    private var needShoot = false
-    weak private var backgroundView: BackgroundView!
-    weak private var delegate: ViewControllerDelegateProtocol!
-    
-    private let previewView: UIView = {
-        let view = UIView()
+    private let backgroundCaptureView: BackgroundView = {
+        let view = BackgroundView(blurStyle: .systemThinMaterialDark)
+        view.configureDarkBlur(withAlpha: 0.75)
+        view.isHidden = true
+
+        return view
+    }()
+
+    private let previewView: CameraPreviewView = {
+        let view = CameraPreviewView()
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
-    
-    private let captureButton: UIButton = {
-        let button = UIButton()
-        button.backgroundColor = #colorLiteral(red: 1, green: 0.8, blue: 0, alpha: 1)
-        button.layer.cornerRadius = 45
+
+    private let actionButtonsView: CameraActionView = {
+        var view = CameraActionView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+
+        return view
+    }()
+
+    private lazy var historyButton: HistoryButton = {
+        let action = UIAction { _ in
+            self.historyButtonTapped?()
+        }
+        let button = HistoryButton(primaryAction: action)
         button.translatesAutoresizingMaskIntoConstraints = false
+
         return button
     }()
-    
-    var sampleBufferDisplayLayer: AVSampleBufferDisplayLayer = {
-        let layer = AVSampleBufferDisplayLayer()
-        layer.videoGravity = .resizeAspectFill
-        layer.transform = CATransform3DMakeRotation( .pi / 2, 0, 0, 1)
-        
-        return layer
-    }()
-    
-    lazy var previewVC: PreviewViewController! = {
-        let vc = PreviewViewController(with: model)
-        vc.modalPresentationStyle = .fullScreen
-        return vc
-    }()
-    
-    let dateFormatter = {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
-        
-        return dateFormatter
-    }()
 
-    private let model: BinPhotoManager
+    private let model: BinPhotoServiceProtocol
+    private var cameraService: CameraServiceProtocol?
+    var capturePreviewDidAppear: (() -> Void)?
+    var capturePreviewDidDisappear: (() -> Void)?
+    var historyButtonTapped: (() -> Void)?
 
-    init(with model: BinPhotoManager) {
+    init(with model: BinPhotoServiceProtocol, _ cameraService: CameraServiceProtocol) {
         self.model = model
+        self.cameraService = cameraService
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -66,212 +56,118 @@ class CameraViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    
-//    init(withDelegate delegate: ViewControllerDelegateProtocol) {
-//        super.init(nibName: nil, bundle: nil)
-//        self.delegate = delegate
-//        self.backgroundView = delegate.getCameraBackgroundView()
-//    }
-//    
-//    required init?(coder: NSCoder) {
-//        fatalError("init(coder:) has not been implemented")
-//    }
-    
+    private enum State {
+        case cameraPreview
+        case capturePreview(UIImage)
+    }
+
+    private var state: State = .cameraPreview {
+        didSet {
+            switch state {
+            case .cameraPreview:
+                backgroundCaptureView.isHidden = true
+                previewView.applyCameraPreviewAppearance()
+                actionButtonsView.applyCameraPreviewAppearance()
+                capturePreviewDidDisappear?()
+            case .capturePreview(let image):
+                backgroundCaptureView.isHidden = false
+                backgroundCaptureView.setBackgroundImage(image, withAnimation: false)
+                previewView.applyCapturePreviewAppearance(with: image.cropToSquare())
+                actionButtonsView.applyCapturePreviewAppearance()
+                capturePreviewDidAppear?()
+            }
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupCamera()
-        
-//        view.addSubview(backgroundView)
-            
-        view.addSubview(previewView)
-        view.addSubview(captureButton)
-//        backgroundView.setLayer(sampleBufferDisplayLayer, withAnimation: false)
-        
-        configureConstraints()
-        
-        captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
-                
-    }
-    
-    private func setupCamera() {
-        guard let device = AVCaptureDevice.default(for: .video) else {
-            print("No video capture device available")
-            return
-        }
-        
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            session.addInput(input)
-            
-            
-            captureOutput = AVCapturePhotoOutput()
-            session.addOutput(captureOutput!)
-            
-            videoDataOutput = AVCaptureVideoDataOutput()
-            videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-            videoDataOutput.setSampleBufferDelegate(self, queue: DispatchQueue.main)
-            session.addOutput(videoDataOutput)
 
-            
-//            session.sessionPreset = AVCaptureSession.Preset.hd1920x1080
-            
-       
-            videoPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
-            videoPreviewLayer?.videoGravity = .resizeAspectFill
-            videoPreviewLayer?.cornerRadius = 60
-            videoPreviewLayer?.cornerCurve = .continuous
-            previewView.layer.addSublayer(videoPreviewLayer!)
-            
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.session.startRunning()
-            }
-             
-            
-        } catch {
-            print("Error setting up video input: \(error.localizedDescription)")
-        }
+        view.addSubview(backgroundCaptureView)
+        view.addSubview(previewView)
+        view.addSubview(actionButtonsView)
+        view.addSubview(historyButton)
+
+        configureConstraints()
+        configurePreviewView()
+        configureButtons()
     }
-    
-    
+
     private func configureConstraints() {
         NSLayoutConstraint.activate([
-            
-            
             previewView.topAnchor.constraint(equalTo: view.topAnchor, constant: 137),
             previewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             previewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            previewView.widthAnchor.constraint(equalTo: previewView.heightAnchor),
-            
-            
-            captureButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            captureButton.topAnchor.constraint(equalTo: previewView.bottomAnchor, constant: 48),
-            captureButton.heightAnchor.constraint(equalToConstant: 90),
-            captureButton.widthAnchor.constraint(equalToConstant: 90)
+            previewView.heightAnchor.constraint(equalTo: previewView.widthAnchor),
+
+            actionButtonsView.topAnchor.constraint(equalTo: previewView.bottomAnchor, constant: 48),
+            actionButtonsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            actionButtonsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            actionButtonsView.heightAnchor.constraint(equalToConstant: 90),
+
+            historyButton.topAnchor.constraint(equalTo: actionButtonsView.bottomAnchor, constant: 46),
+            historyButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            historyButton.widthAnchor.constraint(equalToConstant: 120),
+            historyButton.heightAnchor.constraint(equalToConstant: 66)
         ])
-    }
-    
+    }    
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
-        videoPreviewLayer?.frame = previewView.bounds
-  
-        
-    }
-    
-    @objc private func captureButtonTapped() {
-        guard let captureOutput = captureOutput else { return }
-
-        let settings = AVCapturePhotoSettings()
-
-        captureOutput.capturePhoto(with: settings, delegate: self)
-        
-        needShoot = true
-    }
-    
-    func setBackgroundTransparency(_ transparency: CGFloat) {
-        
-        backgroundView.alpha = transparency
-
-    }
-    
-    
-    private func cropImageToSquare(_ image: UIImage) -> UIImage {
-        let cgImage = image.cgImage!
-        
-        // The shortest side
-        let sideLength = min(
-            cgImage.width,
-            cgImage.height
-        )
-
-        // Determines the x,y coordinate of a centered
-        // sideLength by sideLength square
-        let imageSize = CGSize(width: cgImage.width, height: cgImage.height)
-        let xOffset = (cgImage.width - sideLength) / 2
-        let yOffset = (cgImage.height - sideLength) / 2
-
-        // The cropRect is the rect of the image to keep,
-        // in this case centered
-        let cropRect = CGRect(x: xOffset,
-                              y: yOffset,
-                              width: sideLength,
-                              height: sideLength
-        )
-
-        // Center crop the image
-//        let cgImage = image.cgImage!
-        let croppedCgImage = cgImage.cropping(to: cropRect)!
-        
-
-        // Use the cropped cgImage to initialize a cropped
-        // UIImage with the same image scale and orientation
-        let croppedImage = UIImage(
-            cgImage: croppedCgImage,
-            scale: image.imageRendererFormat.scale,
-            orientation: image.imageOrientation
-        )
-                
-        return croppedImage
+        backgroundCaptureView.frame = view.bounds
     }
 
-    
-    
+    private func configurePreviewView() {
+        let cameraPreviewLayer = cameraService!.getLayerForCameraPreview()
+        previewView.configureWith(previewLayer: cameraPreviewLayer)
+    }
+
+    private func configureButtons() {
+        actionButtonsView.configureCaptureButton(with: onCaptureButtonTapped)
+        actionButtonsView.configureFlashButton(with: onFlashButtonTapped)
+        actionButtonsView.configurePickPhotoButton(with: onPickButtonTapped)
+        actionButtonsView.configureApproveCaptureButton(with: onApproveButtonTapped)
+        actionButtonsView.configureDisapproveCaptureButton(with: onDisapproveButtonTapped)
+
+        let randomImage = UIImage(data: model.getPhotos().randomElement()!.data!)!
+        historyButton.configure(with: randomImage)
+
+        
+    }
+
+    private lazy var onCaptureButtonTapped = { [weak self] in
+        guard let self else { return }
+        self.cameraService!.takePhoto { image in
+            self.state = .capturePreview(image)
+        }
+    }
+
+    private lazy var onApproveButtonTapped = { [weak self] in
+        guard let self,
+              case let .capturePreview(capturedImage) = state else { return }
+        state = .cameraPreview
+
+        DispatchQueue.global(qos: .default).async {
+            let croppedImage = capturedImage.cropToSquare()
+            let photo = BinPhoto()
+            photo.date = Date.now
+            photo.data = croppedImage.jpegData(compressionQuality: 1.0)
+            self.model.saveAndProcessPhoto(photo)
+        }
+    }
+
+    private lazy var onDisapproveButtonTapped = { [weak self] in
+        guard let self else { return }
+        state = .cameraPreview
+    }
+
+    private lazy var onFlashButtonTapped = { [weak self] in
+        guard let self else { return }
+        // TODO: Camera flash
+        cameraService!.isFlashOn.toggle()
+    }
+
+    private lazy var onPickButtonTapped = { [weak self] in
+        // TODO: Pick photo
+    }
 }
-
-
-extension CameraViewController: AVCapturePhotoCaptureDelegate {
-
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        print(dateFormatter.string(from: .now), "did finish photo")
-
-        if let imageData = photo.fileDataRepresentation(), let image = UIImage(data: imageData) {
-
-            let croppedImage = cropImageToSquare(image)
-            
-//            !!!!!!!!!!!!!!!
-            previewVC.configure(withImage: croppedImage)
-        }
-    }
-    
-    
-}
-
-
-
-extension CameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        
-        if sampleBufferDisplayLayer.status == .failed {
-            sampleBufferDisplayLayer.flush()
-        }
-        
-        if needShoot {
-            needShoot.toggle()
-            
-            guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-                return
-            }
-            
-            let ciImage = CIImage(cvPixelBuffer: imageBuffer).transformed(by: CGAffineTransform(rotationAngle: -(.pi / 2)))
-            
-            let context = CIContext()
-            guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
-                return
-            }
-
-            let croppedImage = cropImageToSquare(UIImage(cgImage: cgImage))
-                       
-            
-            previewVC.configure(withImage: croppedImage)
-            present(previewVC, animated: false)
-        }
-      
-        DispatchQueue.main.async {
-            self.sampleBufferDisplayLayer.enqueue(sampleBuffer)
-        }
-        
-    }
-    
-}
-
-

@@ -1,5 +1,5 @@
 //
-//  QueryManager.swift
+//  NetworkService.swift
 //  Summer-practice
 //
 //  Created by work on 14.06.2023.
@@ -8,37 +8,41 @@
 import Foundation
 import UIKit
 
-// NetworkManger
-class QueryManager {
-    
-    static let shared = QueryManager()
-    static var baseUrl = URL(string: "http://172.20.10.3:8080")!        // wi-fi modem
-//    let baseUrl = URL(string: "http://172.20.10.10:8080")!         // usb
-    
+protocol NetworkServiceProtocol {
+    func classifyBin(in image: BinPhoto, completion: @escaping (Result<[Bin], Error>) -> Void)
+    func setServerUrl(_ : URL)
+}
+
+
+class NetworkService: NetworkServiceProtocol {
+    private static var baseUrl = URL(string: "http://172.20.10.3:8080")!        // wi-fi modem
+    //    let baseUrl = URL(string: "http://172.20.10.10:8080")!         // usb
+
+    private static let session = URLSession(configuration: .ephemeral)
+
+
     // MARK: - API methods
-    
+
     func classifyBin(in image: BinPhoto, completion: @escaping (Result<[Bin], Error>) -> Void) {
-        
-        var request = URLRequest(url: URL(string: "/predictions/garbage_cont_classify", relativeTo: QueryManager.baseUrl)!)
+        var request = URLRequest(url: URL(string: "/predictions/garbage_cont_classify", relativeTo: NetworkService.baseUrl)!)
         request.httpMethod = "POST"
-        
+
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
+
         let paramName = "data"
         var data = Data()
-                
+
         data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
         data.append("Content-Disposition: form-data; name=\"\(paramName)\"; filename=\"\(Int64(Date().timeIntervalSince1970*1000)).png\"\r\n".data(using: .utf8)!)
         data.append("Content-Type: image/png\r\n\r\n".data(using: .utf8)!)
         data.append(image.data!)
         data.append(UIImage(data: image.data!)!.pngData()!)
         data.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        
+
         print("did configure request")
 
-
-        URLSession.shared.uploadTask(with: request, from: data) {  data, response, error in
+        NetworkService.session.uploadTask(with: request, from: data) {  data, response, error in
             if let error = error {
                 completion(.failure(error))
                 print("error response")
@@ -49,11 +53,11 @@ class QueryManager {
                 print("fail httpResponse")
                 return
             }
-            
+
             switch httpResponse.statusCode {
             case 200...299:
                 print(String(data: data, encoding: .utf8)!)
-                
+
                 let dataString = String(data: data, encoding: .utf8)!
                 let stringArray = dataString
                     .filter {
@@ -68,7 +72,7 @@ class QueryManager {
                     }
                 }
                 completion(.success(bins))
-                
+
             case 500:
                 print(String(data: data, encoding: .utf8) ?? "error code 500 response")
                 completion(.failure(NSError()))
@@ -76,10 +80,15 @@ class QueryManager {
                 print(String(data: data, encoding: .utf8) ?? "unidentified error response")
                 completion(.failure(NSError()))
             }
-            
+
         }.resume()
+
     }
-    
+
+    func setServerUrl(_ url: URL) {
+        NetworkService.baseUrl = url
+    }
+
 }
 
 

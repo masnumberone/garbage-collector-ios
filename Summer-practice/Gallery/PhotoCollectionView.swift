@@ -1,13 +1,15 @@
 //
-//  PhotoView.swift
+//  PhotoCollectionView.swift
 //  Summer-practice
 //
 //  Created by work on 10.09.2023.
 //
 
+import Foundation
 import UIKit
 
-class PhotoView: UIView {
+class PhotoCollectionView: UIView {
+
     private lazy var imageView: UIImageView = {
         var view = UIImageView(image: image)
         view.clipsToBounds = true
@@ -71,18 +73,17 @@ class PhotoView: UIView {
                                                height: height))
             rectView.backgroundColor = .clear
             rectView.layer.cornerRadius = 10
-            rectView.layer.cornerCurve = .continuous
-            rectView.layer.borderWidth = 3
+            rectView.layer.borderWidth = 6
 
             switch bin.class_name! {
             case "full":
-                rectView.layer.borderColor = #colorLiteral(red: 0.9201472402, green: 0.3259413242, blue: 0.3237701058, alpha: 1).withAlphaComponent(0.9).cgColor
+                rectView.layer.borderColor = UIColor.red.withAlphaComponent(0.75).cgColor
             case "halfempty":
-                rectView.layer.borderColor = #colorLiteral(red: 0.9767822623, green: 0.8522312641, blue: 0.1392843127, alpha: 1).withAlphaComponent(0.9).cgColor
+                rectView.layer.borderColor = UIColor.yellow.withAlphaComponent(0.75).cgColor
             case "empty":
-                rectView.layer.borderColor = #colorLiteral(red: 0.2127317786, green: 0.6835202575, blue: 0.4844830632, alpha: 1).withAlphaComponent(0.9).cgColor
+                rectView.layer.borderColor = UIColor.green.withAlphaComponent(0.75).cgColor
             case "undefined":
-                rectView.layer.borderColor = #colorLiteral(red: 0.06899917126, green: 0.2821590006, blue: 0.4185755253, alpha: 1).withAlphaComponent(0.9).cgColor
+                rectView.layer.borderColor = UIColor.black.withAlphaComponent(0.75).cgColor
             default:
                 break
             }

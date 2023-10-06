@@ -1,5 +1,5 @@
 //
-//  PhotoCollectionViewCell.swift
+//  PhotoViewCell.swift
 //  Summer-practice
 //
 //  Created by work on 05.06.2023.
@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-class PhotoCollectionViewCell: UICollectionViewCell {
+class PhotoViewCell: UICollectionViewCell {
     
     private lazy var photoView: PhotoView = {
         PhotoView(frame: bounds)

@@ -22,12 +22,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let appDelegate = UIApplication.shared.delegate as! AppDelegate
         let managedContext = appDelegate.persistentContainer.viewContext
-        let binPhotoManager = DataManager(with: managedContext)
+        let networkService = MockNetworkService()
+        let binPhotoService = CDBinPhotoService(with: managedContext, networkService)
 
-        let pageVC = PageViewController(with: binPhotoManager)
-        window.rootViewController = pageVC
+        let vc = ViewController(with: binPhotoService, networkService)
+        window.rootViewController = vc
         self.window = window
-        
+
         window.makeKeyAndVisible()
     }
 

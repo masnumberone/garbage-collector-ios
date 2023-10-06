@@ -1,5 +1,5 @@
 //
-//  DataManager.swift
+//  CDBinPhotoService.swift
 //  Summer-practice
 //
 //  Created by work on 12.09.2023.
@@ -12,7 +12,7 @@ protocol Observable {
 }
 
 
-protocol BinPhotoManager: Observable {
+protocol BinPhotoServiceProtocol: Observable {
     func getPhotos() -> [BinPhoto]
     func savePhoto(_: BinPhoto)
     func processPhoto(_: BinPhoto)
@@ -20,11 +20,13 @@ protocol BinPhotoManager: Observable {
     func removePhoto(_: BinPhoto)
 }
 
-class DataManager: BinPhotoManager {
+class CDBinPhotoService: BinPhotoServiceProtocol {
     private let managedContext: NSManagedObjectContext
+    private let networkService: NetworkServiceProtocol
 
-    init(with managedContext: NSManagedObjectContext) {
+    init(with managedContext: NSManagedObjectContext, _ networkService: NetworkServiceProtocol) {
         self.managedContext = managedContext
+        self.networkService = networkService
     }
 
     func getPhotos() -> [BinPhoto] {
@@ -39,11 +41,6 @@ class DataManager: BinPhotoManager {
         return photos
     }
 
-    func savePhoto(_ photo: BinPhoto) {
-        managedContext.insert(photo)
-        saveContext()
-    }
-
     private func saveContext() {
         do {
             try managedContext.save()
@@ -54,8 +51,13 @@ class DataManager: BinPhotoManager {
         valueDidUpdated()
     }
 
+    func savePhoto(_ photo: BinPhoto) {
+        managedContext.insert(photo)
+        saveContext()
+    }
+
     func processPhoto(_ photo: BinPhoto) {
-        QueryManager.shared.classifyBin(in: photo) { [weak self] result in
+        networkService.classifyBin(in: photo) { [weak self] result in
             switch result {
             case .success(let bins):
                 self?.addBins(bins, to: photo)
@@ -66,20 +68,21 @@ class DataManager: BinPhotoManager {
     }
 
     private func addBins(_ bins: [Bin], to photo: BinPhoto) {
-        photo.bins = NSSet(array: bins)
-        photo.is_checked = true
-
         bins.forEach {
             managedContext.insert($0)
             $0.binPhoto = photo
             $0.id_bin_photo = photo.id
         }
+
+        photo.bins = NSSet(array: bins)
+        photo.is_checked = true
+
         saveContext()
     }
 
     func saveAndProcessPhoto(_ photo: BinPhoto) {
-        savePhoto(photo)
-        processPhoto(photo)
+        self.savePhoto(photo)
+        self.processPhoto(photo)
     }
 
     func removePhoto(_ photo: BinPhoto) {
@@ -100,7 +103,9 @@ class DataManager: BinPhotoManager {
     }
 
     private func valueDidUpdated() {
-        onUpdate.forEach { $0() }
+        DispatchQueue.main.async {
+            self.onUpdate.forEach { $0() }
+        }
     }
 }
 

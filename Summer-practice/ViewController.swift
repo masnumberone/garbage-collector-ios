@@ -3,17 +3,13 @@
 //  Summer-practice
 //
 //  Created by work on 02.06.2023.
-//  Created by work on 02.06.2023.
 //
 
 import UIKit
 
-// две страницы в uipageview. вторая стринца содержит коллекцию и стейтВью поверх коллекции
 
-class ViewController: UIViewController {
-    
+class ViewController: UIViewController, UIGestureRecognizerDelegate {
     lazy var collectionView: UICollectionView = {
-        
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
         layout.itemSize = view.frame.size
@@ -27,63 +23,85 @@ class ViewController: UIViewController {
         return collectionView
     }()
     
-    
+
     lazy var backgroundPhotoView: BackgroundView = {
-        let view = BackgroundView(blurStyle: .systemMaterialDark)
+        let view = BackgroundView(blurStyle: .systemUltraThinMaterialDark)
+        view.configureDarkBlur(withAlpha: 0.7)
         view.alpha = 0
         
         return view
     }()
     
     private let backgroundCameraView: BackgroundView = {
-        let view = BackgroundView(blurStyle: .systemThinMaterialDark)  // почему Thin???
-        view.configureDarkBlur()
-        
+        let view = BackgroundView(blurStyle: .systemThinMaterialDark)
+        view.configureDarkBlur(withAlpha: 0.75)
+
         return view
     }()
 
-    private lazy var stateView: BottomStateView = {
-        let view = BottomStateView(frame: .zero)
-        view.isHidden = true
+    private lazy var stateView: GalleryStateView = {
+        let view = GalleryStateView(frame: .zero)
         view.translatesAutoresizingMaskIntoConstraints = false
-
         view.configure(onTapDeleteButton: deleteCurrentPhoto, onTapUpdateButton: updateCurrentPhoto)
 
         return view
     }()
-    
-    private lazy var preferencesButton: UIButton = {
-        var button = UIButton()
-        button.setImage(UIImage(systemName: "gear"), for: .normal)
-        button.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(font: .rounded(ofSize: 22, weight: .semibold), scale: .default),
-                                               forImageIn: .normal)
 
-        button.tintColor = .white
-        button.translatesAutoresizingMaskIntoConstraints = false
-//        button.isHidden = false
-        
-        button.addTarget(self, action: #selector(changeServerAddress), for: .touchUpInside)
-        
-        return button
+    private lazy var galleryBottomView: GalleryBottomView = {
+        let view = GalleryBottomView(frame: .zero)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.configureCameraButton(with: scrollToCamera)
+
+        return view
     }()
-    
 
-    
-    var dataSource: UICollectionViewDiffableDataSource<Section, AnyHashable>!
-    var snapshot: NSDiffableDataSourceSnapshot<Section, AnyHashable>!
-    
-    var displayedItem = IndexPath(item: 0, section: 0) {
+    private lazy var titleView: TitleView = {
+        let view = TitleView(frame: .zero)
+        view.onTapSettingsButton = changeServerAddress
+        view.state = .cameraPreview
+        view.translatesAutoresizingMaskIntoConstraints = false
+
+        return view
+    }()
+
+    private enum Section: Int, CaseIterable {
+        case camera
+        case photo
+    }
+
+    private var dataSource: UICollectionViewDiffableDataSource<Section, AnyHashable>!
+    private var snapshot: NSDiffableDataSourceSnapshot<Section, AnyHashable>!
+    private let model: BinPhotoServiceProtocol
+    private let networkService: NetworkServiceProtocol
+    private var cameraService: CameraServiceProtocol
+    private let cameraVC: CameraViewController
+    private var galleryBottomViewBottomConstraint: [NSLayoutConstraint]!
+
+    var displayedItem = IndexPath(item: 0, section: 1) {
         didSet {
             if displayedItem.section > 0 {
-                stateView.isHidden = false
-                preferencesButton.isHidden = true
+                titleView.state = .gallery
             } else {
-                stateView.isHidden = true
-                preferencesButton.isHidden = false
+                titleView.state = .cameraPreview
             }
+
+            updateStateView()
+            updateBackgroundPhotoView()
         }
     }
-       
+
+    init(with model: BinPhotoServiceProtocol, _ networkService: NetworkServiceProtocol) {
+        self.model = model
+        self.networkService = networkService
+        self.cameraService = AVCameraService()
+        self.cameraVC = CameraViewController(with: model, cameraService)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -92,16 +110,50 @@ class ViewController: UIViewController {
         view.addSubview(backgroundPhotoView)
         view.addSubview(collectionView)
         
+        view.addSubview(titleView)
         view.addSubview(stateView)
-        view.addSubview(preferencesButton)
-        
+        view.addSubview(galleryBottomView)
+
+        configureConstraints()
         configureCollectionView()
         configureDataSource()
+        configureModel()
 
+        cameraVC.capturePreviewDidAppear = capturePreviewDidAppear
+        cameraVC.capturePreviewDidDisappear = capturePreviewDidDisappear
+        cameraVC.historyButtonTapped = scrollToGallery
+    }
+
+    func configureModel() {
+        model.subscribe { [weak self] in
+            self?.updateDataAndViews()
+        }
+    }
+
+    func configureConstraints() {
+        galleryBottomViewBottomConstraint = [galleryBottomView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: view.bounds.height)]
+
+        NSLayoutConstraint.activate([
+            titleView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 3),
+            titleView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            titleView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            titleView.heightAnchor.constraint(equalToConstant: 44),
+
+            stateView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            stateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            stateView.bottomAnchor.constraint(equalTo: galleryBottomView.topAnchor, constant: -19),
+            stateView.heightAnchor.constraint(equalToConstant: 52),
+
+
+            galleryBottomView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            galleryBottomView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            galleryBottomView.heightAnchor.constraint(equalToConstant: 52)
+
+        ] + galleryBottomViewBottomConstraint)
     }
     
     func configureDataSource() {
-        var photos: [BinPhoto] = BinPhotoProvider.shared.fetchObjects()!
+        var photos: [BinPhoto] = model.getPhotos()
         photos.sort { $0.date! > $1.date! }
         
         snapshot = NSDiffableDataSourceSnapshot<Section, AnyHashable>()
@@ -109,165 +161,117 @@ class ViewController: UIViewController {
         snapshot.deleteAllItems()
         snapshot.appendSections(Section.allCases)
         
-//        snapshot.appendItems([CameraViewController(withDelegate: self)], toSection: Section.camera)
+        snapshot.appendItems([cameraVC], toSection: Section.camera)
         snapshot.appendItems(photos, toSection: Section.photo)
         
         collectionView.dataSource = dataSource
         dataSource.apply(snapshot)
     }
 
+
+    func configureCollectionView() {
+        collectionView.delegate = self
+        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cameraCell")
+        collectionView.register(PhotoViewCell.self, forCellWithReuseIdentifier: "photoCell")
+
+        collectionView.delaysContentTouches = false
+        collectionView.panGestureRecognizer.delaysTouchesBegan = false
+//        collectionView.panGestureRecognizer.cancelsTouchesInView = false
+
+        dataSource = UICollectionViewDiffableDataSource<Section, AnyHashable>(
+            collectionView: collectionView,
+            cellProvider: { (collectionView, indexPath, model) -> UICollectionViewCell? in
+
+                guard let section = Section(rawValue: indexPath.section) else { return .init() }
+
+                switch section {
+                case .camera:
+                    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cameraCell", for: indexPath)
+                    let cameraVC = model as! CameraViewController
+                    cell.addSubview(cameraVC.view)
+                    return cell
+
+                case .photo:
+                    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photoCell", for: indexPath) as? PhotoViewCell
+                    let model = model as! BinPhoto
+                    let imageData = model.data!
+                    cell?.configureWith(image: .init(data: imageData)!, bins: model.bins)
+                    return cell
+                }
+            }
+        )
+    }
+
     
     func updateDataSource() {
-        var photos: [BinPhoto] = BinPhotoProvider.shared.fetchObjects()!
+        var photos: [BinPhoto] = model.getPhotos()
         photos.sort { $0.date! > $1.date! }
-    
+
         snapshot.deleteSections([Section.photo])
         snapshot.appendSections([Section.photo])
-        
-//        snapshot.appendItems([CameraViewController(withBackgroundView: backgroundCameraView)], toSection: Section.camera)
+
         snapshot.appendItems(photos, toSection: Section.photo)
         
         collectionView.dataSource = dataSource
         dataSource.apply(snapshot)
     }
     
-    func updateView() {
+    func updateDataAndViews() {
+        updateDataSource()
         collectionView.reloadData()
-        updateBottomLabel()
+        updateBackgroundPhotoView()
+        updateStateView()
     }
     
-    func updateViewBackground() {
-        let binPhoto = dataSource.itemIdentifier(for: displayedItem) as! BinPhoto
-        let image = UIImage(data: binPhoto.data!)
-        let layer = CALayer()
-        layer.contents = image?.cgImage
-        layer.transform = CATransform3DMakeRotation( .pi / 2, 0, 0, 1)
-        backgroundPhotoView.setLayer(layer, withAnimation: true)
-        
+    func updateBackgroundPhotoView() {
+        guard let currentPhoto = dataSource.itemIdentifier(for: displayedItem) as? BinPhoto else { return }
+        let image = UIImage(data: currentPhoto.data!) ?? UIImage()
+        backgroundPhotoView.setBackgroundImage(image, withAnimation: true)
     }
     
-    func updateBottomLabel() {
-        guard let currentPhoto = dataSource.itemIdentifier(for: displayedItem) as? BinPhoto else {
-            return
-        }
-        
+    func updateStateView() {
+        guard let currentPhoto = dataSource.itemIdentifier(for: displayedItem) as? BinPhoto else { return }
         if !currentPhoto.is_checked {
             stateView.state = .fail
-        } else if currentPhoto.bins?.count == 0 {
+        } else if currentPhoto.bins?.count == 0 || currentPhoto.bins == nil {
             stateView.state = .noFound
         } else {
             stateView.state = .found(currentPhoto.bins?.count ?? 0)
         }
     }
-    
-    func configureCollectionView() {
-        collectionView.delegate = self
-        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
-        collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "photoCell")
-        
-        
-        dataSource = UICollectionViewDiffableDataSource<Section, AnyHashable>(
-            collectionView: collectionView,
-            cellProvider: { [weak self] (collectionView, indexPath, model) -> UICollectionViewCell? in
-               
-                guard let self, let section = Section(rawValue: indexPath.section)
-                    else { return .init() }
-                
-                switch section {
-                case .camera:
-                    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cell", for: indexPath) as? UICollectionViewCell
-                    let view = model as! CameraViewController
 
-                    cell?.addSubview(view.view)
-
-                    return cell
-                    
-                case .photo:
-                    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "photoCell", for: indexPath) as? PhotoCollectionViewCell
-                    let model = model as! BinPhoto
- 
-                    cell?.configureWith(image: .init(data: model.data!)!, bins: model.bins)
-
-                    
-                    return cell
-                    
-                }
-                
-            }
-        )
-    }
-    
-    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        collectionView.frame = .init(x: 0,
-                                     y: 0,
-                                     width: view.frame.width,
-                                     height: view.frame.height)
-        
-        backgroundPhotoView.frame = collectionView.frame
-        backgroundCameraView.frame = collectionView.frame
-        
-        NSLayoutConstraint.activate([
-            stateView.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
-            stateView.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
-            stateView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            stateView.heightAnchor.constraint(equalToConstant: 52),
-            
-            preferencesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            preferencesButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            preferencesButton.heightAnchor.constraint(equalToConstant: 44),
-            preferencesButton.widthAnchor.constraint(equalToConstant: 44)
-            
-        ])
+
+        collectionView.frame = view.bounds
+        backgroundCameraView.frame = view.bounds
+        backgroundPhotoView.frame = view.bounds
+
+        let backgroundCameraLayer = cameraService.getLayerForCameraBackground()
+        backgroundCameraView.setBackgroundLayer(backgroundCameraLayer, withAnimation: false)
     }
 
     private lazy var deleteCurrentPhoto = { [weak self] in
-        guard let currentPhoto = self?.dataSource.itemIdentifier(for: self!.displayedItem) as? BinPhoto else {
-            return
-        }
-        BinPhotoProvider.shared.deleteObject(currentPhoto)
-        self?.updateDataSource()
+        guard let self,
+              let currentPhoto = self.dataSource.itemIdentifier(for: self.displayedItem) as? BinPhoto else { return }
+        self.model.removePhoto(currentPhoto)
     }
 
     private lazy var updateCurrentPhoto = { [weak self] in
-        guard let currentPhoto = self?.dataSource.itemIdentifier(for: self!.displayedItem) as? BinPhoto else {
-            return
-        }
-        
-        QueryManager.shared.classifyBin(in: currentPhoto) { result in
-            switch result {
-            case .success(let bins):
-                currentPhoto.bins = NSSet(array: bins)
-                currentPhoto.is_checked = true
-                
-                bins.forEach {
-                    $0.binPhoto = currentPhoto
-                    $0.id_bin_photo = currentPhoto.id
-                }
-                
-            case .failure(_):
-                currentPhoto.is_checked = false
-            }
-            
-            DispatchQueue.main.async {
-                BinPhotoProvider.shared.saveContext()
-                self?.updateView()
-            }
-            
-        }
+        guard let self,
+              let currentPhoto = self.dataSource.itemIdentifier(for: self.displayedItem) as? BinPhoto else { return }
+        self.model.processPhoto(currentPhoto)
     }
-    
-    @objc
-    private func changeServerAddress() {
+
+    private lazy var changeServerAddress = { [weak self] in
         let alertController = UIAlertController(title: "Input IP-address", message: nil, preferredStyle: .alert)
         let confirmAction = UIAlertAction(title: "Confirm", style: .default) { (_) in
             if let txtField = alertController.textFields?.first, let text = txtField.text {
                 guard let url = URL(string: "http://" + text) else {
-                    self.changeServerAddress()
+//                    self.changeServerAddress()
                     return
                 }
-                QueryManager.baseUrl = url
+                self?.networkService.setServerUrl(url)
             }
         }
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel) { (_) in }
@@ -276,9 +280,30 @@ class ViewController: UIViewController {
         }
         alertController.addAction(confirmAction)
         alertController.addAction(cancelAction)
-        present(alertController, animated: true, completion: nil)
+        self?.present(alertController, animated: true, completion: nil)
     }
-        
+
+    private lazy var capturePreviewDidAppear = { [weak self] in
+        guard let self else { return }
+        self.titleView.state = .capturePreview
+        self.collectionView.isScrollEnabled = false
+    }
+
+    private lazy var capturePreviewDidDisappear = { [weak self] in
+        guard let self else { return }
+        self.titleView.state = .cameraPreview
+        self.collectionView.isScrollEnabled = true
+    }
+
+    private lazy var scrollToGallery = { [weak self] in
+        guard let self else { return }
+        self.collectionView.scrollToItem(at: IndexPath(item: 0, section: 1), at: .top, animated: true)
+    }
+
+    private lazy var scrollToCamera = { [weak self] in
+        guard let self else { return }
+        self.collectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: true)
+    }
 }
 
 
@@ -292,37 +317,27 @@ extension ViewController: UICollectionViewDelegateFlowLayout {
         
         let currentItem = collectionView.indexPathForItem(at: contentOffset) ?? displayedItem
         
-        
         if (displayedItem != currentItem) {
             displayedItem = currentItem
-            print(displayedItem)
-            
-            updateBottomLabel()
-            
-            switch dataSource.sectionIdentifier(for: displayedItem.section)! {
-            case .camera:
-                break
-                
-            case .photo:
-                updateViewBackground()
-            }
         }
         
         if (displayedItem.item == 0) {
             let alpha = CGFloat(collectionView.contentOffset.y / scrollView.frame.height)
             backgroundPhotoView.alpha = alpha
         }
+
+        if (scrollView.contentOffset.y < scrollView.bounds.height) {
+            let offset = scrollView.bounds.height - scrollView.contentOffset.y
+
+            NSLayoutConstraint.deactivate(galleryBottomViewBottomConstraint)
+            galleryBottomViewBottomConstraint = [ galleryBottomView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: offset - 43) ]
+            NSLayoutConstraint.activate(galleryBottomViewBottomConstraint)
+        } else {
+            NSLayoutConstraint.deactivate(galleryBottomViewBottomConstraint)
+            galleryBottomViewBottomConstraint = [ galleryBottomView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -43) ]
+            NSLayoutConstraint.activate(galleryBottomViewBottomConstraint)
+        }
+
     }
     
-}
-
-
-extension ViewController: ViewControllerDelegateProtocol {
-    func getCameraBackgroundView() -> BackgroundView {
-        backgroundCameraView
-    }
-    
-    func needUpdate() {
-        updateDataSource()
-    }
 }
