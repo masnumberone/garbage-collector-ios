@@ -96,6 +96,16 @@ class CameraActionView: UIView {
         return button
     }()
 
+    func setFlashButton(enabled: Bool) {
+        if enabled {
+            flashButton.configure(withImage: "bolt.fill", roundedFontSize: 32, tintColor: .white.withAlphaComponent(0.9))
+            flashButton.tintColor = #colorLiteral(red: 1, green: 0.7215477228, blue: 0.0005452816258, alpha: 1)
+        } else {
+            flashButton.configure(withImage: "bolt", roundedFontSize: 32, tintColor: .white.withAlphaComponent(0.9))
+            flashButton.tintColor = .white
+        }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubviews()

@@ -163,8 +163,8 @@ class CameraViewController: UIViewController {
 
     private lazy var onFlashButtonTapped = { [weak self] in
         guard let self else { return }
-        // TODO: Camera flash
         cameraService!.isFlashOn.toggle()
+        actionButtonsView.setFlashButton(enabled: cameraService!.isFlashOn)
     }
 
     private lazy var onPickButtonTapped = { [weak self] in

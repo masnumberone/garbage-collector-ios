@@ -11,8 +11,8 @@ import AVKit
 protocol CameraServiceProtocol {
     func getLayerForCameraPreview() -> CALayer
     func getLayerForCameraBackground() -> CALayer
-    func takePhoto(handler: @escaping (UIImage) -> Void)
-    func takeHighQualityPhoto(handler: @escaping (UIImage) -> Void)
+    func takePhoto(completion: @escaping (UIImage) -> Void)
+    func takeHighQualityPhoto(completion: @escaping (UIImage) -> Void)
 
     var isFlashOn: Bool { get set }
 }
@@ -26,19 +26,24 @@ class AVCameraService: NSObject, CameraServiceProtocol {
         sampleBufferDisplayLayerForBackground
     }
 
-    func takePhoto(handler: @escaping (UIImage) -> Void) {
+    func takePhoto(completion: @escaping (UIImage) -> Void) {
+        guard !isFlashOn else {
+            takeHighQualityPhoto(completion: completion)
+            return
+        }
         needTakePhotoFromSampleBuffer = true
-        takePhotoHandler = handler
+        takePhotoCompletion = completion
     }
 
-    func takeHighQualityPhoto(handler: @escaping (UIImage) -> Void) {
-        capturePhoto()
+    func takeHighQualityPhoto(completion: @escaping (UIImage) -> Void) {
+        takeHighQualityPhotoCompletion = completion
+        captureQualityPhoto()
     }
 
     var isFlashOn = false
     private var needTakePhotoFromSampleBuffer = false
-    private var takePhotoHandler: ((UIImage) -> Void)?
-    private var takeHighQualityPhotoHandler: ((UIImage) -> Void)?
+    private var takePhotoCompletion: ((UIImage) -> Void)?
+    private var takeHighQualityPhotoCompletion: ((UIImage) -> Void)?
     private let session = AVCaptureSession()
     private var captureOutput: AVCapturePhotoOutput?
     private var videoDataOutput: AVCaptureVideoDataOutput!
@@ -96,29 +101,29 @@ class AVCameraService: NSObject, CameraServiceProtocol {
         }
     }
 
-    private lazy var capturePhoto = { [weak self] in
-        guard let self,
-              let captureOutput = self.captureOutput else { return }
+    private func captureQualityPhoto() {
+        guard let captureOutput = captureOutput else { return }
 
         let settings = AVCapturePhotoSettings()
         let previewPixelType = settings.availablePreviewPhotoPixelFormatTypes.first!
         settings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPixelType,
                                        kCVPixelBufferWidthKey as String: 160,
                                        kCVPixelBufferHeightKey as String: 160]
+        settings.flashMode = isFlashOn ? .on : .off
         captureOutput.capturePhoto(with: settings, delegate: self)
     }
 }
 
 extension AVCameraService: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        DispatchQueue.main.sync {
-            guard let imageData = photo.fileDataRepresentation(),
-                  let image = UIImage(data: imageData) else { return }
-            let croppedImage = image.cropToSquare()
-            takeHighQualityPhotoHandler?(croppedImage)
-        }
+        guard let imageData = photo.fileDataRepresentation(),
+              let ciImage = CIImage(data: imageData) else { return }
+        let transformedCiImage = ciImage.transformed(by: .init(rotationAngle: -(.pi / 2)))
+        guard let cgImage = CIContext().createCGImage(transformedCiImage, from: transformedCiImage.extent) else { return }
+        let image = UIImage(cgImage: cgImage)
 
-        takeHighQualityPhotoHandler = nil
+        takeHighQualityPhotoCompletion?(image)
+        takeHighQualityPhotoCompletion = nil
     }
 }
 
@@ -140,15 +145,14 @@ extension AVCameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
             DispatchQueue.main.sync {
                 guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-                let rotateTransform = CGAffineTransform(rotationAngle: -(.pi / 2))
-                let ciImage = CIImage(cvPixelBuffer: imageBuffer).transformed(by: rotateTransform)
+                let ciImage = CIImage(cvPixelBuffer: imageBuffer).transformed(by: .init(rotationAngle: -(.pi / 2)))
                 let context = CIContext()
                 guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
                 let image = UIImage(cgImage: cgImage)
 
-                takePhotoHandler?(image)
+                takePhotoCompletion?(image)
             }
-            takePhotoHandler = nil
+            takePhotoCompletion = nil
             needTakePhotoFromSampleBuffer = false
         }
     }
