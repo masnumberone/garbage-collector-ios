@@ -32,7 +32,24 @@ class ApproveCaptureButton: AnimatedButton {
         tintColor = .white.withAlphaComponent(0.9)
         
         setAnimatedView(imageView!)
-//        setAnimation { _, _ in }
+    }
+
+    func setColoredWithAnimation(_ isColored: Bool) {
+        isColored ? setYellowColorWithAnimation() : setWhiteColor()
+    }
+
+    private func setYellowColorWithAnimation() {
+        imageView?.transform = .init(scaleX: 0.5, y: 0.5)
+        UIView.animate(withDuration: 0.3) {
+            self.tintColor = .black
+            self.backgroundColor = #colorLiteral(red: 1, green: 0.7215477228, blue: 0.0005452816258, alpha: 1)
+            self.imageView?.transform = .identity
+        }
+    }
+
+    private func setWhiteColor() {
+        tintColor = .white.withAlphaComponent(0.9)
+        backgroundColor = #colorLiteral(red: 0.2823526859, green: 0.2823531032, blue: 0.2901956141, alpha: 1)
     }
 
     override var intrinsicContentSize: CGSize {

@@ -21,13 +21,13 @@ class TitleView: UIView {
             switch newValue {
             case .cameraPreview:
                 titleLabel.text = "Take photo to detect bin"
-                settingsButton.isHidden = false
+                settingsButton.alpha = 1
             case .capturePreview:
-                titleLabel.text = "Check photo C:"
-                settingsButton.isHidden = true
+                titleLabel.text = "Check photo ✨"
+                settingsButton.alpha = 0
             case .gallery:
                 titleLabel.text = "History"
-                settingsButton.isHidden = true
+                settingsButton.alpha = 0
             }
         }
     }

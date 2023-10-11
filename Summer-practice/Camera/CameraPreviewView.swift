@@ -16,7 +16,8 @@ class CameraPreviewView: UIView {
         layer.cornerCurve = .continuous
         translatesAutoresizingMaskIntoConstraints = false
 
-        layer.addSublayer(captureLayer)
+        captureView.alpha = 0
+        addSubview(captureView)
     }
 
     required init?(coder: NSCoder) {
@@ -24,7 +25,7 @@ class CameraPreviewView: UIView {
     }
 
     private var cameraLayer: CALayer?
-    private var captureLayer = CALayer()
+    private var captureView = UIImageView()
 
     func configureWith(previewLayer newLayer: CALayer) {
         cameraLayer?.removeFromSuperlayer()
@@ -32,23 +33,23 @@ class CameraPreviewView: UIView {
         cameraLayer!.bounds = bounds
         layer.addSublayer(cameraLayer!)
 
-        captureLayer.removeFromSuperlayer()
-        layer.addSublayer(captureLayer)
+        captureView.removeFromSuperview()
+        addSubview(captureView)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         cameraLayer?.frame = bounds
-        captureLayer.frame = bounds
+        captureView.frame = bounds
     }
 
     func applyCapturePreviewAppearance(with image: UIImage) {
-        let cgImage = image.cgImage
-        captureLayer.contents = cgImage
+        captureView.image = image
+        captureView.alpha = 1
     }
 
     func applyCameraPreviewAppearance() {
-        captureLayer.contents = nil
+        captureView.alpha = 0
     }
 }
 

@@ -121,6 +121,8 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
 
         cameraVC.capturePreviewDidAppear = capturePreviewDidAppear
         cameraVC.capturePreviewDidDisappear = capturePreviewDidDisappear
+        cameraVC.capturePreviewDidDisappearWithAnimation = capturePreviewDidDisappearWithAnimation
+        cameraVC.capturePreviewWillDisappearWithAnimation = capturePreviewWillDisappearWithAnimation
         cameraVC.historyButtonTapped = scrollToGallery
     }
 
@@ -293,6 +295,37 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
         guard let self else { return }
         self.titleView.state = .cameraPreview
         self.collectionView.isScrollEnabled = true
+    }
+
+    private lazy var capturePreviewDidDisappearWithAnimation = { [weak self] in
+        guard let self else { return }
+        collectionView.isScrollEnabled = true
+
+        titleView.alpha = 0.8
+        cameraVC.view.alpha = 0.8
+
+        let transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        let invertedTransform = CGAffineTransformInvert(transform)
+        view.transform = transform
+        backgroundPhotoView.transform = invertedTransform
+        backgroundCameraView.transform = invertedTransform
+
+        UIView.animate(withDuration: 0.3, delay: .zero, options: .curveEaseInOut) {
+            self.titleView.state = .cameraPreview
+            self.titleView.alpha = 1
+            self.cameraVC.view.alpha = 1
+
+            self.view.transform = .identity
+            self.backgroundPhotoView.transform = .identity
+            self.backgroundCameraView.transform = .identity
+        }
+    }
+
+    private lazy var capturePreviewWillDisappearWithAnimation = { [weak self] in
+        guard let self else { return }
+        UIView.animate(withDuration: 0.2, delay: .zero, options: .curveEaseIn) {
+            self.titleView.alpha = 0
+        }
     }
 
     private lazy var scrollToGallery = { [weak self] in

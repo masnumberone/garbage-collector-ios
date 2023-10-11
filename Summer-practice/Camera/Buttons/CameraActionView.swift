@@ -85,7 +85,7 @@ class CameraActionView: UIView {
         return button
     }()
 
-    private lazy var approveButton: AnimatedButton = {
+    private lazy var approveButton: ApproveCaptureButton = {
         let action = UIAction { _ in
             self.onApproveButtonTap?()
         }
@@ -104,6 +104,10 @@ class CameraActionView: UIView {
             flashButton.configure(withImage: "bolt", roundedFontSize: 32, tintColor: .white.withAlphaComponent(0.9))
             flashButton.tintColor = .white
         }
+    }
+
+    func setApproveButtonColored(_ isColored: Bool) {
+        approveButton.setColoredWithAnimation(isColored)
     }
 
     override init(frame: CGRect) {

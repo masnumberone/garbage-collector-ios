@@ -12,7 +12,7 @@ class CameraViewController: UIViewController {
     private let backgroundCaptureView: BackgroundView = {
         let view = BackgroundView(blurStyle: .systemThinMaterialDark)
         view.configureDarkBlur(withAlpha: 0.75)
-        view.isHidden = true
+        view.alpha = 0
 
         return view
     }()
@@ -44,6 +44,8 @@ class CameraViewController: UIViewController {
     private var cameraService: CameraServiceProtocol?
     var capturePreviewDidAppear: (() -> Void)?
     var capturePreviewDidDisappear: (() -> Void)?
+    var capturePreviewDidDisappearWithAnimation: (() -> Void)?
+    var capturePreviewWillDisappearWithAnimation: (() -> Void)?
     var historyButtonTapped: (() -> Void)?
 
     init(with model: BinPhotoServiceProtocol, _ cameraService: CameraServiceProtocol) {
@@ -65,17 +67,55 @@ class CameraViewController: UIViewController {
         didSet {
             switch state {
             case .cameraPreview:
-                backgroundCaptureView.isHidden = true
-                previewView.applyCameraPreviewAppearance()
-                actionButtonsView.applyCameraPreviewAppearance()
-                capturePreviewDidDisappear?()
+                return
             case .capturePreview(let image):
-                backgroundCaptureView.isHidden = false
+                backgroundCaptureView.alpha = 1
                 backgroundCaptureView.setBackgroundImage(image, withAnimation: false)
                 previewView.applyCapturePreviewAppearance(with: image.cropToSquare())
                 actionButtonsView.applyCapturePreviewAppearance()
+                historyButton.alpha = 0
                 capturePreviewDidAppear?()
             }
+        }
+    }
+
+    private func applyCameraPreviewAppearanceWithAnimation() {
+        state = .cameraPreview
+        actionButtonsView.setApproveButtonColored(true)
+        view.layoutIfNeeded()
+
+        let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeInOut)
+        animator.addAnimations {
+            NSLayoutConstraint.deactivate(self.previewViewConstraints)
+            NSLayoutConstraint.activate(self.previewViewConstraintsForAnimation)
+            self.actionButtonsView.alpha = 0
+            self.capturePreviewWillDisappearWithAnimation?()
+            self.view.layoutIfNeeded()
+        }
+        animator.addCompletion { _ in            
+            NSLayoutConstraint.deactivate(self.previewViewConstraintsForAnimation)
+            NSLayoutConstraint.activate(self.previewViewConstraints)
+
+            self.backgroundCaptureView.alpha = 0
+            self.previewView.applyCameraPreviewAppearance()
+            self.actionButtonsView.alpha = 1
+            self.actionButtonsView.applyCameraPreviewAppearance()
+            self.actionButtonsView.setApproveButtonColored(false)
+            self.historyButton.alpha = 1
+            self.capturePreviewDidDisappearWithAnimation?()
+        }
+        animator.startAnimation(afterDelay: 0.6)
+    }
+
+    private func applyCameraPreviewAppearance() {
+        state = .cameraPreview
+
+        UIView.animate(withDuration: 0.2) {
+            self.backgroundCaptureView.alpha = 0
+            self.previewView.applyCameraPreviewAppearance()
+            self.actionButtonsView.applyCameraPreviewAppearance()
+            self.historyButton.alpha = 1
+            self.capturePreviewDidDisappear?()
         }
     }
 
@@ -92,14 +132,23 @@ class CameraViewController: UIViewController {
         configureButtons()
     }
 
-    private func configureConstraints() {
-        NSLayoutConstraint.activate([
-            previewView.topAnchor.constraint(equalTo: view.topAnchor, constant: 137),
-            previewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            previewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            previewView.heightAnchor.constraint(equalTo: previewView.widthAnchor),
+    private lazy var previewViewConstraints = [
+        previewView.topAnchor.constraint(equalTo: view.topAnchor, constant: 137),
+        previewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+        previewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        previewView.heightAnchor.constraint(equalTo: previewView.widthAnchor)
+    ]
 
-            actionButtonsView.topAnchor.constraint(equalTo: previewView.bottomAnchor, constant: 48),
+    private lazy var previewViewConstraintsForAnimation = [
+        previewView.bottomAnchor.constraint(equalTo: view.topAnchor),
+        previewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+        previewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        previewView.heightAnchor.constraint(equalTo: previewView.widthAnchor)
+    ]
+
+    private func configureConstraints() {
+        NSLayoutConstraint.activate(previewViewConstraints + [
+            actionButtonsView.topAnchor.constraint(equalTo: view.topAnchor, constant: 575),
             actionButtonsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             actionButtonsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             actionButtonsView.heightAnchor.constraint(equalToConstant: 90),
@@ -145,7 +194,7 @@ class CameraViewController: UIViewController {
     private lazy var onApproveButtonTapped = { [weak self] in
         guard let self,
               case let .capturePreview(capturedImage) = state else { return }
-        state = .cameraPreview
+        applyCameraPreviewAppearanceWithAnimation()
 
         DispatchQueue.global(qos: .default).async {
             let croppedImage = capturedImage.cropToSquare()
@@ -158,7 +207,7 @@ class CameraViewController: UIViewController {
 
     private lazy var onDisapproveButtonTapped = { [weak self] in
         guard let self else { return }
-        state = .cameraPreview
+        applyCameraPreviewAppearance()
     }
 
     private lazy var onFlashButtonTapped = { [weak self] in
