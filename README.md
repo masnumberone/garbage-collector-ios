@@ -48,7 +48,7 @@
     Running on http://192.168.1.101:8080
     ```
 
-## Демо
+## Демо (mock api)
 <p align="left">
   <img src="https://github.com/masnumberone/garbage-collector-ios/assets/95964517/ac8a4a46-8b0c-4dcf-8acf-6c06d59c2068" width="30%"/>
 </p
